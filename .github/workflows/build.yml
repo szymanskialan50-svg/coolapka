@@ -45,21 +45,107 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
+            SKIP_INSTALL=NO \
             | xcpretty || true
 
-      - name: Find and package .app into IPA
+      - name: Verify and fix Info.plist in .app bundle
         run: |
-          APP_PATH=$(find "${{ github.workspace }}/build" -name "*.app" -type d | grep -v ".xctest" | head -1)
+          BUILD_DIR="${{ github.workspace }}/build"
+          APP_PATH=$(find "${BUILD_DIR}" -name "*.app" -type d | grep -v ".xctest" | head -1)
           echo "Found app at: $APP_PATH"
+
           if [ -z "$APP_PATH" ]; then
-            echo "ERROR: .app not found! Listing build dir:"
-            find "${{ github.workspace }}/build" -maxdepth 5 | head -50
+            echo "ERROR: .app not found! Build dir contents:"
+            find "${BUILD_DIR}" -maxdepth 6 | head -80
             exit 1
           fi
+
+          PLIST_PATH="${APP_PATH}/Info.plist"
+          if [ ! -f "$PLIST_PATH" ]; then
+            echo "⚠️  Info.plist missing from .app — injecting from XcodeGen generated plist..."
+            # XcodeGen outputs the generated plist here:
+            GEN_PLIST=$(find "${{ github.workspace }}" -path "*/PayWallet/Config/Info.plist" | head -1)
+            if [ -n "$GEN_PLIST" ]; then
+              cp "$GEN_PLIST" "$PLIST_PATH"
+              echo "✅ Copied from: $GEN_PLIST"
+            else
+              echo "🔨 Generating minimal Info.plist..."
+              cat > "$PLIST_PATH" << 'PLISTEOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleDevelopmentRegion</key>
+              <string>pl</string>
+              <key>CFBundleDisplayName</key>
+              <string>PayWallet</string>
+              <key>CFBundleExecutable</key>
+              <string>PayWallet</string>
+              <key>CFBundleIdentifier</key>
+              <string>com.paywallet.app</string>
+              <key>CFBundleInfoDictionaryVersion</key>
+              <string>6.0</string>
+              <key>CFBundleName</key>
+              <string>PayWallet</string>
+              <key>CFBundlePackageType</key>
+              <string>APPL</string>
+              <key>CFBundleShortVersionString</key>
+              <string>1.0</string>
+              <key>CFBundleVersion</key>
+              <string>1</string>
+              <key>ITSAppUsesNonExemptEncryption</key>
+              <false/>
+              <key>LSRequiresIPhoneOS</key>
+              <true/>
+              <key>MinimumOSVersion</key>
+              <string>16.0</string>
+              <key>NSCameraUsageDescription</key>
+              <string>Aparat służy do skanowania karty płatniczej.</string>
+              <key>NSFaceIDUsageDescription</key>
+              <string>Face ID potwierdza płatności.</string>
+              <key>NFCReaderUsageDescription</key>
+              <string>NFC służy do odczytu Twojej karty płatniczej.</string>
+              <key>UILaunchScreen</key>
+              <dict/>
+              <key>UISupportedInterfaceOrientations</key>
+              <array>
+                  <string>UIInterfaceOrientationPortrait</string>
+              </array>
+              <key>com.apple.developer.nfc.readersession.iso7816.select-identifiers</key>
+              <array>
+                  <string>325041592E5359532E4444463031</string>
+                  <string>A0000000031010</string>
+                  <string>A0000000041010</string>
+                  <string>A0000000042203</string>
+                  <string>A0000000043060</string>
+                  <string>A00000000501</string>
+                  <string>A000000025</string>
+                  <string>A0000001523010</string>
+              </array>
+          </dict>
+          </plist>
+          PLISTEOF
+              echo "✅ Minimal Info.plist written."
+            fi
+          else
+            echo "✅ Info.plist already present at $PLIST_PATH"
+          fi
+
+          # Final sanity check
+          echo "--- Info.plist contents ---"
+          cat "$PLIST_PATH"
+
+      - name: Package .app into IPA
+        run: |
+          BUILD_DIR="${{ github.workspace }}/build"
+          APP_PATH=$(find "${BUILD_DIR}" -name "*.app" -type d | grep -v ".xctest" | head -1)
           mkdir -p Payload
           cp -r "$APP_PATH" Payload/
           zip -r PayWallet.ipa Payload
           echo "IPA size: $(du -sh PayWallet.ipa)"
+          # Verify plist is in the zip
+          echo "--- Files in IPA (Payload/PayWallet.app/Info.plist check) ---"
+          unzip -l PayWallet.ipa | grep -i "info.plist" || echo "WARNING: Info.plist not in IPA!"
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
