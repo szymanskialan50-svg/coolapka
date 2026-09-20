@@ -35,7 +35,7 @@ jobs:
           BUILD_DIR="${GITHUB_WORKSPACE}/build"
           mkdir -p "${BUILD_DIR}"
 
-          xcodebuild clean build \
+          xcodebuild build \
             -project PayWallet.xcodeproj \
             -scheme PayWallet \
             -configuration Release \
@@ -45,10 +45,15 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
-            SKIP_INSTALL=NO
+            SKIP_INSTALL=NO \
+            ONLY_ACTIVE_ARCH=NO \
+            ARCHS="arm64" \
+            VALID_ARCHS="arm64" \
+            ASSETCATALOG_COMPILER_APPICON_NAME="" \
+            ASSETCATALOG_COMPILER_SKIP_APP_STORE_DEPLOYMENT=YES
 
           echo "=== Build dir contents ==="
-          find "${BUILD_DIR}" -maxdepth 5 -name "*.app" -o -name "Info.plist" | head -40
+          find "${BUILD_DIR}" -maxdepth 5 \( -name "*.app" -o -name "Info.plist" \) | head -40
 
       - name: Verify Info.plist and package IPA
         run: |
@@ -98,6 +103,14 @@ jobs:
 
           echo "=== Final Info.plist ==="
           cat "${PLIST}"
+
+          # Inject app icon manually (actool disabled to avoid simulator runtime bug)
+          ICON_SRC="${GITHUB_WORKSPACE}/PayWallet/icon.png"
+          if [ -f "${ICON_SRC}" ]; then
+            cp "${ICON_SRC}" "${APP_PATH}/AppIcon60x60@2x.png"
+            cp "${ICON_SRC}" "${APP_PATH}/AppIcon76x76@2x~ipad.png"
+            echo "✅ Icon injected"
+          fi
 
           mkdir -p Payload
           cp -r "${APP_PATH}" Payload/
