@@ -1,0 +1,46 @@
+name: PayWallet
+options:
+  bundleIdPrefix: com.paywallet
+  deploymentTarget:
+    iOS: "16.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+packages:
+  GoogleSignIn:
+    path: GoogleSignIn-iOS-main
+
+targets:
+  PayWallet:
+    type: application
+    platform: iOS
+    sources: [PayWallet]
+    dependencies:
+      - package: GoogleSignIn
+    info:
+      path: Config/Info.plist
+      properties:
+        CFBundleDisplayName: PayWallet
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        NSCameraUsageDescription: Aparat służy do skanowania karty płatniczej.
+        NSFaceIDUsageDescription: Face ID potwierdza płatności.
+        NFCReaderUsageDescription: NFC służy do odczytu Twojej karty płatniczej.
+        ITSAppUsesNonExemptEncryption: false
+        com.apple.developer.nfc.readersession.iso7816.select-identifiers:
+          - 325041592E5359532E4444463031
+          - A0000000031010
+          - A0000000041010
+          - A0000000042203
+          - A0000000043060
+          - A00000000501
+          - A000000025
+          - A0000001523010
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.paywallet.app
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        TARGETED_DEVICE_FAMILY: "1"
+        ENABLE_PREVIEWS: NO
