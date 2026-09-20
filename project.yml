@@ -15,8 +15,8 @@ packages:
     url: https://github.com/leif-ibsen/SwiftECC.git
     majorVersion: 5.2.0
   BigInt:
-    url: https://github.com/attaswift/BigInt.git
-    majorVersion: 5.3.0
+    url: https://github.com/leif-ibsen/BigInt.git
+    majorVersion: 1.15.0
   Reg:
     url: https://github.com/yhkaplan/Reg.git
     majorVersion: 0.3.0
