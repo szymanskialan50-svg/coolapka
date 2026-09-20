@@ -23,100 +23,75 @@ jobs:
       - name: Generate Xcode Project
         run: xcodegen generate
 
-      - name: Resolve Swift packages
-        run: |
-          xcodebuild -resolvePackageDependencies \
-            -project PayWallet.xcodeproj \
-            -scheme PayWallet
-
-      - name: Build unsigned .app
+      - name: Archive app (unsigned)
         run: |
           set -euo pipefail
-          BUILD_DIR="${GITHUB_WORKSPACE}/build"
-          mkdir -p "${BUILD_DIR}"
+          ARCHIVE="${GITHUB_WORKSPACE}/PayWallet.xcarchive"
 
-          xcodebuild build \
+          xcodebuild archive \
             -project PayWallet.xcodeproj \
             -scheme PayWallet \
             -configuration Release \
             -sdk iphoneos \
-            SYMROOT="${BUILD_DIR}" \
-            OBJROOT="${BUILD_DIR}/obj" \
+            -archivePath "${ARCHIVE}" \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             SKIP_INSTALL=NO \
             ONLY_ACTIVE_ARCH=NO \
             ARCHS="arm64" \
-            VALID_ARCHS="arm64" \
             ASSETCATALOG_COMPILER_APPICON_NAME="" \
             ASSETCATALOG_COMPILER_SKIP_APP_STORE_DEPLOYMENT=YES
 
-          echo "=== Build dir contents ==="
-          find "${BUILD_DIR}" -maxdepth 5 \( -name "*.app" -o -name "Info.plist" \) | head -40
+          echo "=== xcarchive contents ==="
+          find "${ARCHIVE}" -maxdepth 4 | head -30
 
-      - name: Verify Info.plist and package IPA
+      - name: Package IPA
         run: |
           set -euo pipefail
-          BUILD_DIR="${GITHUB_WORKSPACE}/build"
+          ARCHIVE="${GITHUB_WORKSPACE}/PayWallet.xcarchive"
+          APP_PATH="${ARCHIVE}/Products/Applications/PayWallet.app"
 
-          APP_PATH=$(find "${BUILD_DIR}" -name "*.app" -type d | grep -v "\.xctest" | head -1)
-          echo "App path: ${APP_PATH}"
-
-          if [ -z "${APP_PATH}" ]; then
-            echo "ERROR: No .app found. Full build tree:"
-            find "${BUILD_DIR}" | head -100
+          if [ ! -d "${APP_PATH}" ]; then
+            echo "ERROR: .app not in expected xcarchive path. Full tree:"
+            find "${ARCHIVE}" | head -60
             exit 1
           fi
 
+          # Fix Info.plist if missing
           PLIST="${APP_PATH}/Info.plist"
-
           if [ ! -f "${PLIST}" ]; then
-            echo "Info.plist missing — injecting..."
-            GEN=$(find "${GITHUB_WORKSPACE}" -path "*/Config/Info.plist" | head -1)
-            if [ -n "${GEN}" ]; then
-              cp "${GEN}" "${PLIST}"
-              echo "Copied from ${GEN}"
-            else
-              /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string PayWallet"       "${PLIST}"
-              /usr/libexec/PlistBuddy -c "Add :CFBundleExecutable string PayWallet"        "${PLIST}"
-              /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string com.paywallet.app" "${PLIST}"
-              /usr/libexec/PlistBuddy -c "Add :CFBundleInfoDictionaryVersion string 6.0"   "${PLIST}"
-              /usr/libexec/PlistBuddy -c "Add :CFBundleName string PayWallet"              "${PLIST}"
-              /usr/libexec/PlistBuddy -c "Add :CFBundlePackageType string APPL"            "${PLIST}"
-              /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 1.0"      "${PLIST}"
-              /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string 1"                   "${PLIST}"
-              /usr/libexec/PlistBuddy -c "Add :MinimumOSVersion string 16.0"               "${PLIST}"
-              /usr/libexec/PlistBuddy -c "Add :LSRequiresIPhoneOS bool true"               "${PLIST}"
-              /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false"   "${PLIST}"
-              /usr/libexec/PlistBuddy -c "Add :UILaunchScreen dict"                        "${PLIST}"
-              /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'Aparat służy do skanowania karty.'" "${PLIST}"
-              /usr/libexec/PlistBuddy -c "Add :NSFaceIDUsageDescription string 'Face ID potwierdza platnosci.'"     "${PLIST}"
-              /usr/libexec/PlistBuddy -c "Add :NFCReaderUsageDescription string 'NFC do odczytu karty.'"           "${PLIST}"
-              /usr/libexec/PlistBuddy -c "Add :UISupportedInterfaceOrientations array"     "${PLIST}"
-              /usr/libexec/PlistBuddy -c "Add :UISupportedInterfaceOrientations:0 string UIInterfaceOrientationPortrait" "${PLIST}"
-              echo "Built minimal plist via PlistBuddy"
-            fi
+            echo "Injecting Info.plist..."
+            /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string PayWallet"          "${PLIST}"
+            /usr/libexec/PlistBuddy -c "Add :CFBundleExecutable string PayWallet"           "${PLIST}"
+            /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string com.paywallet.app"   "${PLIST}"
+            /usr/libexec/PlistBuddy -c "Add :CFBundleInfoDictionaryVersion string 6.0"      "${PLIST}"
+            /usr/libexec/PlistBuddy -c "Add :CFBundleName string PayWallet"                 "${PLIST}"
+            /usr/libexec/PlistBuddy -c "Add :CFBundlePackageType string APPL"               "${PLIST}"
+            /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 1.0"         "${PLIST}"
+            /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string 1"                      "${PLIST}"
+            /usr/libexec/PlistBuddy -c "Add :MinimumOSVersion string 16.0"                  "${PLIST}"
+            /usr/libexec/PlistBuddy -c "Add :LSRequiresIPhoneOS bool true"                  "${PLIST}"
+            /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false"      "${PLIST}"
+            /usr/libexec/PlistBuddy -c "Add :UILaunchScreen dict"                           "${PLIST}"
+            /usr/libexec/PlistBuddy -c "Add :UISupportedInterfaceOrientations array"        "${PLIST}"
+            /usr/libexec/PlistBuddy -c "Add :UISupportedInterfaceOrientations:0 string UIInterfaceOrientationPortrait" "${PLIST}"
+            echo "Plist injected ✅"
           else
-            echo "Info.plist already present ✅"
+            echo "Info.plist present ✅"
+            cat "${PLIST}"
           fi
 
-          echo "=== Final Info.plist ==="
-          cat "${PLIST}"
-
-          # Inject app icon manually (actool disabled to avoid simulator runtime bug)
-          ICON_SRC="${GITHUB_WORKSPACE}/PayWallet/icon.png"
-          if [ -f "${ICON_SRC}" ]; then
-            cp "${ICON_SRC}" "${APP_PATH}/AppIcon60x60@2x.png"
-            cp "${ICON_SRC}" "${APP_PATH}/AppIcon76x76@2x~ipad.png"
-            echo "✅ Icon injected"
-          fi
+          # Inject icon
+          ICON="${GITHUB_WORKSPACE}/PayWallet/icon.png"
+          [ -f "${ICON}" ] && cp "${ICON}" "${APP_PATH}/AppIcon60x60@2x.png" && echo "Icon injected ✅"
 
           mkdir -p Payload
           cp -r "${APP_PATH}" Payload/
           zip -r PayWallet.ipa Payload
+
           echo "IPA size: $(du -sh PayWallet.ipa)"
-          unzip -l PayWallet.ipa | grep "Info.plist"
+          unzip -l PayWallet.ipa | grep -i "info.plist" || { echo "ERROR: Info.plist not in IPA!"; exit 1; }
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
