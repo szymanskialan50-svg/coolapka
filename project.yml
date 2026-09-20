@@ -31,7 +31,10 @@ targets:
   PayWallet:
     type: application
     platform: iOS
-    sources: [PayWallet]
+    sources:
+      - path: PayWallet
+        excludes:
+          - "icon.png"
     dependencies:
       - package: GoogleSignIn
       - package: SwiftECC
@@ -41,7 +44,7 @@ targets:
       - package: SwiftCertificates
         product: X509
     info:
-      path: Config/Info.plist
+      path: PayWallet/Config/Info.plist
       properties:
         CFBundleDisplayName: PayWallet
         UILaunchScreen: {}
