@@ -1,0 +1,46 @@
+name: Build iOS App
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build unsigned IPA
+    runs-on: macos-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Install XcodeGen
+        run: brew install xcodegen
+        
+      - name: Generate Xcode Project
+        run: xcodegen generate
+        
+      - name: Build unsigned .app
+        run: |
+          xcodebuild clean build \
+            -project PayWallet.xcodeproj \
+            -scheme PayWallet \
+            -configuration Release \
+            -sdk iphoneos \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+          
+      - name: Create .ipa from .app
+        run: |
+          mkdir -p Payload
+          # xcodebuild defaults to outputting in build/ directory when OBJROOT/SYMROOT is not set but let's be safe
+          # To ensure we find it, we search for the app
+          find . -name "PayWallet.app" -type d -exec cp -r {} Payload/ \;
+          zip -r PayWallet.ipa Payload
+          
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PayWallet-iOS-IPA
+          path: PayWallet.ipa
