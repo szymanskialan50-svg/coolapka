@@ -40,7 +40,6 @@ jobs:
             -scheme PayWallet \
             -configuration Release \
             -sdk iphoneos \
-            -destination "generic/platform=iOS" \
             SYMROOT="${BUILD_DIR}" \
             OBJROOT="${BUILD_DIR}/obj" \
             CODE_SIGN_IDENTITY="" \
