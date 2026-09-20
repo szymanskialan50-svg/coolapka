@@ -11,6 +11,21 @@ settings:
 packages:
   GoogleSignIn:
     path: GoogleSignIn-iOS-main
+  SwiftECC:
+    url: https://github.com/leif-ibsen/SwiftECC.git
+    majorVersion: 5.2.0
+  BigInt:
+    url: https://github.com/attaswift/BigInt.git
+    majorVersion: 5.3.0
+  Reg:
+    url: https://github.com/yhkaplan/Reg.git
+    majorVersion: 0.3.0
+  Sukar:
+    url: https://github.com/yhkaplan/Sukar.git
+    majorVersion: 0.1.0
+  SwiftCertificates:
+    url: https://github.com/apple/swift-certificates.git
+    majorVersion: 1.0.0
 
 targets:
   PayWallet:
@@ -19,6 +34,12 @@ targets:
     sources: [PayWallet]
     dependencies:
       - package: GoogleSignIn
+      - package: SwiftECC
+      - package: BigInt
+      - package: Reg
+      - package: Sukar
+      - package: SwiftCertificates
+        product: X509
     info:
       path: Config/Info.plist
       properties:
