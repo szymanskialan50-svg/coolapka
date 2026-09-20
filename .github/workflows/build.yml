@@ -1,101 +1,59 @@
-name: Build iOS App
+name: Build IPA
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [main, master]
   workflow_dispatch:
 
 jobs:
   build:
-    name: Build unsigned IPA
     runs-on: macos-15
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Select Xcode 16
-        run: sudo xcode-select -s /Applications/Xcode_16.app/Contents/Developer
+      - name: Ensure Assets.xcassets structure
+        run: |
+          mkdir -p PayWallet/Assets.xcassets/AppIcon.appiconset
+          if [ ! -f PayWallet/Assets.xcassets/Contents.json ]; then
+            echo '{"info":{"author":"xcode","version":1}}' > PayWallet/Assets.xcassets/Contents.json
+          fi
+          if [ ! -f PayWallet/Assets.xcassets/AppIcon.appiconset/Contents.json ]; then
+            echo '{"images":[{"filename":"icon.png","idiom":"universal","platform":"ios","size":"1024x1024"}],"info":{"author":"xcode","version":1}}' > PayWallet/Assets.xcassets/AppIcon.appiconset/Contents.json
+          fi
+          if [ ! -f PayWallet/Assets.xcassets/AppIcon.appiconset/icon.png ] && [ -f PayWallet/icon.png ]; then
+            cp PayWallet/icon.png PayWallet/Assets.xcassets/AppIcon.appiconset/icon.png
+          fi
+          find . -not -path "./.git/*" -type f | sort
 
       - name: Install XcodeGen
         run: brew install xcodegen
 
-      - name: Generate Xcode Project
+      - name: Generate Xcode project
         run: xcodegen generate
 
-      - name: Archive app (unsigned)
+      - name: Build (unsigned)
         run: |
-          set -euo pipefail
-          ARCHIVE="${GITHUB_WORKSPACE}/PayWallet.xcarchive"
-
-          xcodebuild archive \
-            -project PayWallet.xcodeproj \
-            -scheme PayWallet \
-            -configuration Release \
-            -sdk iphoneos \
-            -archivePath "${ARCHIVE}" \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            SKIP_INSTALL=NO \
-            ONLY_ACTIVE_ARCH=NO \
-            ARCHS="arm64" \
-            ASSETCATALOG_COMPILER_APPICON_NAME="" \
-            ASSETCATALOG_COMPILER_SKIP_APP_STORE_DEPLOYMENT=YES
-
-          echo "=== xcarchive contents ==="
-          find "${ARCHIVE}" -maxdepth 4 | head -30
+          set -o pipefail
+          xcodebuild -project PayWallet.xcodeproj -scheme PayWallet \
+            -configuration Release -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            | tee build.log | tail -n 60
 
       - name: Package IPA
         run: |
-          set -euo pipefail
-          ARCHIVE="${GITHUB_WORKSPACE}/PayWallet.xcarchive"
-          APP_PATH="${ARCHIVE}/Products/Applications/PayWallet.app"
-
-          if [ ! -d "${APP_PATH}" ]; then
-            echo "ERROR: .app not in expected xcarchive path. Full tree:"
-            find "${ARCHIVE}" | head -60
-            exit 1
-          fi
-
-          # Fix Info.plist if missing
-          PLIST="${APP_PATH}/Info.plist"
-          if [ ! -f "${PLIST}" ]; then
-            echo "Injecting Info.plist..."
-            /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string PayWallet"          "${PLIST}"
-            /usr/libexec/PlistBuddy -c "Add :CFBundleExecutable string PayWallet"           "${PLIST}"
-            /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string com.paywallet.app"   "${PLIST}"
-            /usr/libexec/PlistBuddy -c "Add :CFBundleInfoDictionaryVersion string 6.0"      "${PLIST}"
-            /usr/libexec/PlistBuddy -c "Add :CFBundleName string PayWallet"                 "${PLIST}"
-            /usr/libexec/PlistBuddy -c "Add :CFBundlePackageType string APPL"               "${PLIST}"
-            /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 1.0"         "${PLIST}"
-            /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string 1"                      "${PLIST}"
-            /usr/libexec/PlistBuddy -c "Add :MinimumOSVersion string 16.0"                  "${PLIST}"
-            /usr/libexec/PlistBuddy -c "Add :LSRequiresIPhoneOS bool true"                  "${PLIST}"
-            /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false"      "${PLIST}"
-            /usr/libexec/PlistBuddy -c "Add :UILaunchScreen dict"                           "${PLIST}"
-            /usr/libexec/PlistBuddy -c "Add :UISupportedInterfaceOrientations array"        "${PLIST}"
-            /usr/libexec/PlistBuddy -c "Add :UISupportedInterfaceOrientations:0 string UIInterfaceOrientationPortrait" "${PLIST}"
-            echo "Plist injected ✅"
-          else
-            echo "Info.plist present ✅"
-            cat "${PLIST}"
-          fi
-
-          # Inject icon
-          ICON="${GITHUB_WORKSPACE}/PayWallet/icon.png"
-          [ -f "${ICON}" ] && cp "${ICON}" "${APP_PATH}/AppIcon60x60@2x.png" && echo "Icon injected ✅"
-
           mkdir -p Payload
-          cp -r "${APP_PATH}" Payload/
-          zip -r PayWallet.ipa Payload
+          cp -R build/Build/Products/Release-iphoneos/PayWallet.app Payload/
+          zip -qry PayWallet.ipa Payload
 
-          echo "IPA size: $(du -sh PayWallet.ipa)"
-          unzip -l PayWallet.ipa | grep -i "info.plist" || { echo "ERROR: Info.plist not in IPA!"; exit 1; }
-
-      - name: Upload IPA
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: PayWallet-iOS-IPA
+          name: PayWallet-ipa
           path: PayWallet.ipa
-          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: build-log
+          path: build.log
