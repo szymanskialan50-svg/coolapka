@@ -86,7 +86,8 @@ public class OperationAuthenticateWithWebEID: NSObject {
     }
 }
 
-extension OperationAuthenticateWithWebEID: @MainActor NFCTagReaderSessionDelegate {
+@MainActor
+extension OperationAuthenticateWithWebEID: NFCTagReaderSessionDelegate {
     public func tagReaderSession(_ session: NFCTagReaderSession, didDetect tags: [NFCTag]) {
         Task { @MainActor [weak self] in
             guard let self else { return }

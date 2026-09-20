@@ -63,7 +63,8 @@ public class OperationUnblockPin: NSObject {
     }
 }
 
-extension OperationUnblockPin: @MainActor NFCTagReaderSessionDelegate {
+@MainActor
+extension OperationUnblockPin: NFCTagReaderSessionDelegate {
     public func tagReaderSession(_ session: NFCTagReaderSession, didDetect tags: [NFCTag]) {
         Task { @MainActor [weak self] in
             guard let self else { return }

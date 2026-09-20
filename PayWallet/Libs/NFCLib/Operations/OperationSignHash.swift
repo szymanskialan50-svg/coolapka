@@ -70,7 +70,8 @@ public class OperationSignHash: NSObject {
     }
 }
 
-extension OperationSignHash: @MainActor NFCTagReaderSessionDelegate {
+@MainActor
+extension OperationSignHash: NFCTagReaderSessionDelegate {
     public func tagReaderSession(_ session: NFCTagReaderSession, didDetect tags: [NFCTag]) {
 
         Task { @MainActor in

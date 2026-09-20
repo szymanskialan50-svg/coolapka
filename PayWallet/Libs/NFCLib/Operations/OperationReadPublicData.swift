@@ -48,7 +48,8 @@ import BigInt
     }
 }
 
-extension OperationReadPublicData: @MainActor NFCTagReaderSessionDelegate {
+@MainActor
+extension OperationReadPublicData: NFCTagReaderSessionDelegate {
     public func tagReaderSession(_ session: NFCTagReaderSession, didDetect tags: [NFCTag]) {
         Task {
             do {
